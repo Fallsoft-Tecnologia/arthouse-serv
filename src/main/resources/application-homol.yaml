@@ -4,8 +4,8 @@ spring:
       repositories:
         enabled: true
   datasource:
-    username: ${SPRING_DATASOURCE_URL:arthouse}
-    url: jdbc:mysql://${SPRING_DATASOURCE_USERNAME:arthouse_db:3306/arthouse}
+    username: ${SPRING_DATASOURCE_USERNAME:arthouse}
+    url: jdbc:mysql://${SPRING_DATASOURCE_URL:arthouse_db:3306/arthouse}
     password: ${SPRING_DATASOURCE_PASSWORD:arthouse-db}
     maxLifetime: 1800000 # Tempo máximo de vida da conexão em milissegundos (30 minutos)
   jpa:
