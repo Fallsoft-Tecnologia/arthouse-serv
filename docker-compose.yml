@@ -15,6 +15,7 @@ services:
     networks:
       - backend
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
 
   arthouse-serv:
     build:
@@ -32,6 +33,7 @@ services:
       - arthouse_db
     networks:
       - backend
+    restart: unless-stopped
 networks:
   backend:
     driver: "bridge"
