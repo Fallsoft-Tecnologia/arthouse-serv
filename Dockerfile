@@ -1,4 +1,4 @@
 FROM openjdk:17
-ADD target/arthouse-serv-1.0.0-SNAPSHOT.jar app.jar
+ADD target/arthouse-serv-1.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-Dspring.profiles.active=homol", "-jar", "/app.jar"]
