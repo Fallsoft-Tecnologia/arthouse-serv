@@ -65,7 +65,7 @@ public class ProdutoService {
 
         var tipoProduto = tipoProdutoService.getTipoProduto(responseProdutoDTO.tipoProduto());
         var statusProduto = statusProdutoService.getStatusProdutoByNome(responseProdutoDTO.statusProduto());
-        var retornoProdutoSalvo = saveProduto(produtoMapper.produtoDTOToEntity(multipartFile,tipoProduto,statusProduto, responseProdutoDTO.descricao()));
+        var retornoProdutoSalvo = saveProduto(produtoMapper.produtoDTOToEntity(comprimirImagem(multipartFile.getBytes()), multipartFile.getOriginalFilename(), tipoProduto, statusProduto, responseProdutoDTO.descricao()));
 
         responseProdutoDTO.caracteristicasProduto().forEach(x -> {
             var caracteristicasProduto = caracteriticaProdutoService.buscarCaracteristicasProdutoByNome(x);
@@ -81,8 +81,8 @@ public class ProdutoService {
 
 
     public byte[] downloadProdutoById(Integer idProduto) {
-        byte[] produto = buscarProduto(idProduto).getContProduto();
-        return comprimirImagem(produto);
+        return buscarProduto(idProduto).getContProduto();
+
     }
 
 
@@ -101,26 +101,13 @@ public class ProdutoService {
         var caracteristicas = filtroProdutoDTO.caracteristicas().isEmpty() ? null : filtroProdutoDTO.caracteristicas();
         var ordenacao = logicaOrdenacao(filtroProdutoDTO);
 
-        // Buscar produtos da base de dados
-        Page<ProdutosDTO> produtos = produtoRepository.getProdutosFiltro(
-                cores, caracteristicas, page, ordenacao.primeiroNumeroOrdenacao(), ordenacao.segundoNumeroOrdenacao());
+        return produtoRepository.getProdutosFiltro(cores, caracteristicas, page, ordenacao.primeiroNumeroOrdenacao(), ordenacao.segundoNumeroOrdenacao());
 
-        // Comprimir as imagens antes de retornar para o front-end
-        produtos.getContent().forEach(produto -> {
-            try {
-                byte[] imagemComprimida = comprimirImagem(produto.getContProduto());
-                produto.setContProduto(imagemComprimida);
-            } catch (ProdutosExceptions e) {
-                throw new ProdutosExceptions("Erro ao comprimir imagem para o produto: " + produto.getNomeProduto() + " - " + e.getMessage());
-            }
-        });
-
-        return produtos;
     }
 
-    // Método de compressão da imagem
     private byte[] comprimirImagem(byte[] imagemOriginal) {
         try {
+
             // Converter o array de bytes original em um BufferedImage
             ByteArrayInputStream bais = new ByteArrayInputStream(imagemOriginal);
             BufferedImage imagem = ImageIO.read(bais);
@@ -150,12 +137,16 @@ public class ProdutoService {
                 writer.write(null, new javax.imageio.IIOImage(imagem, null, null), param);
             }
 
+            // Obtendo o tamanho da imagem comprimida
+            byte[] imagemComprimida = baos.toByteArray();
+
             // Retornar a imagem comprimida em base64
-            return Base64.getEncoder().encode(baos.toByteArray());
+            return imagemComprimida;
         } catch (Exception e) {
             throw new ProdutosExceptions("Erro ao comprimir a imagem: " + e.getMessage());
         }
     }
+
 
     public OrdenacaoDTO logicaOrdenacao(FiltroProdutoDTO filtroProdutoDTO) {
         if (filtroProdutoDTO.ordenacao() == 0) {
@@ -191,15 +182,15 @@ public class ProdutoService {
 
     }
 
-    public ProdutoIdDTO buscaProdutoPorId(Integer idProduto){
+    public ProdutoIdDTO buscaProdutoPorId(Integer idProduto) {
         return produtoRepository.buscaProdutoPorId(idProduto);
     }
 
-    public List<TipoProduto> buscarTodosTipoProdutos(){
+    public List<TipoProduto> buscarTodosTipoProdutos() {
         return tipoProdutoRepository.findAll();
     }
 
-    public List<StatusProduto> buscarStatusTipoProdutos(){
+    public List<StatusProduto> buscarStatusTipoProdutos() {
         return statusProdutoRepository.findAll();
     }
 
