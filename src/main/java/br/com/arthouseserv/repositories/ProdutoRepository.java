@@ -14,7 +14,7 @@ import java.util.List;
 @Repository
 public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
 
-    @Query("SELECT new br.com.arthouseserv.dto.ProdutosDTO(p.idProduto,p.contProduto,sp.nomeStatusProduto,p.nomeProduto,p.descProduto) " +
+    @Query("SELECT new br.com.arthouseserv.dto.ProdutosDTO(p.idProduto, p.contProduto, sp.nomeStatusProduto, p.nomeProduto, p.descProduto) " +
             "FROM Produto p " +
             "LEFT JOIN CorProdutoProduto cpp " +
             "ON p.idProduto = cpp.produto.idProduto " +
@@ -25,12 +25,12 @@ public interface ProdutoRepository extends JpaRepository<Produto, Integer> {
             "LEFT JOIN p.statusProduto sp " +
             "WHERE(:cores IS NULL OR cp.nomeCorProduto IN :cores) " +
             "AND(:caracteristicas IS NULL OR crcp.nomeCaracterisiticasProduto IN :caracteristicas) " +
-            "GROUP BY p.idProduto,p.contProduto,sp.nomeStatusProduto,p.nomeProduto,p.descProduto " +
+            "GROUP BY p.idProduto, p.contProduto, sp.nomeStatusProduto, p.nomeProduto, p.descProduto " +
             "ORDER BY CASE " +
-            "WHEN sp.idStatusProduto NOT IN (:ordenacaoUm,:ordenacaoDois) THEN 1 " +
+            "WHEN sp.idStatusProduto NOT IN (:ordenacaoUm, :ordenacaoDois) THEN 1 " +
             "WHEN sp.idStatusProduto = :ordenacaoUm THEN 2 " +
             "ELSE 3 " +
-            "END ")
+            "END")
     Page<ProdutosDTO> getProdutosFiltro(List<String> cores, List<String> caracteristicas, Pageable pageable, Integer ordenacaoUm, Integer ordenacaoDois);
 
     @Query("SELECT new br.com.arthouseserv.dto.ProdutoIdDTO(p.idProduto,p.contProduto,p.nomeProduto,p.descProduto) FROM Produto p WHERE p.idProduto =:idProduto")
