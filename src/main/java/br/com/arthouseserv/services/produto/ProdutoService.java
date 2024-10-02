@@ -15,8 +15,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 
 @Service
@@ -56,7 +65,7 @@ public class ProdutoService {
 
         var tipoProduto = tipoProdutoService.getTipoProduto(responseProdutoDTO.tipoProduto());
         var statusProduto = statusProdutoService.getStatusProdutoByNome(responseProdutoDTO.statusProduto());
-        var retornoProdutoSalvo = saveProduto(produtoMapper.produtoDTOToEntity(multipartFile,tipoProduto,statusProduto, responseProdutoDTO.descricao()));
+        var retornoProdutoSalvo = saveProduto(produtoMapper.produtoDTOToEntity(comprimirImagem(multipartFile.getBytes()), multipartFile.getOriginalFilename(), tipoProduto, statusProduto, responseProdutoDTO.descricao()));
 
         responseProdutoDTO.caracteristicasProduto().forEach(x -> {
             var caracteristicasProduto = caracteriticaProdutoService.buscarCaracteristicasProdutoByNome(x);
@@ -73,6 +82,7 @@ public class ProdutoService {
 
     public byte[] downloadProdutoById(Integer idProduto) {
         return buscarProduto(idProduto).getContProduto();
+
     }
 
 
@@ -90,8 +100,53 @@ public class ProdutoService {
         var cores = filtroProdutoDTO.cores().isEmpty() ? null : filtroProdutoDTO.cores();
         var caracteristicas = filtroProdutoDTO.caracteristicas().isEmpty() ? null : filtroProdutoDTO.caracteristicas();
         var ordenacao = logicaOrdenacao(filtroProdutoDTO);
+
         return produtoRepository.getProdutosFiltro(cores, caracteristicas, page, ordenacao.primeiroNumeroOrdenacao(), ordenacao.segundoNumeroOrdenacao());
+
     }
+
+    private byte[] comprimirImagem(byte[] imagemOriginal) {
+        try {
+
+            // Converter o array de bytes original em um BufferedImage
+            ByteArrayInputStream bais = new ByteArrayInputStream(imagemOriginal);
+            BufferedImage imagem = ImageIO.read(bais);
+
+            if (imagem == null) {
+                throw new ProdutosExceptions("A imagem original é inválida.");
+            }
+
+            // Criar o output stream para armazenar a imagem comprimida
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            // Obter um ImageWriter para JPEG
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+            if (!writers.hasNext()) {
+                throw new ProdutosExceptions("Não há ImageWriters disponíveis para JPEG.");
+            }
+            ImageWriter writer = writers.next();
+
+            // Configurar os parâmetros de escrita para compressão
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(0.5f); // Ajustar a qualidade entre 0 e 1, onde 1 é a melhor qualidade
+
+            // Criar um ImageOutputStream
+            try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {
+                writer.setOutput(ios);
+                writer.write(null, new javax.imageio.IIOImage(imagem, null, null), param);
+            }
+
+            // Obtendo o tamanho da imagem comprimida
+            byte[] imagemComprimida = baos.toByteArray();
+
+            // Retornar a imagem comprimida em base64
+            return imagemComprimida;
+        } catch (Exception e) {
+            throw new ProdutosExceptions("Erro ao comprimir a imagem: " + e.getMessage());
+        }
+    }
+
 
     public OrdenacaoDTO logicaOrdenacao(FiltroProdutoDTO filtroProdutoDTO) {
         if (filtroProdutoDTO.ordenacao() == 0) {
@@ -127,15 +182,15 @@ public class ProdutoService {
 
     }
 
-    public ProdutoIdDTO buscaProdutoPorId(Integer idProduto){
+    public ProdutoIdDTO buscaProdutoPorId(Integer idProduto) {
         return produtoRepository.buscaProdutoPorId(idProduto);
     }
 
-    public List<TipoProduto> buscarTodosTipoProdutos(){
+    public List<TipoProduto> buscarTodosTipoProdutos() {
         return tipoProdutoRepository.findAll();
     }
 
-    public List<StatusProduto> buscarStatusTipoProdutos(){
+    public List<StatusProduto> buscarStatusTipoProdutos() {
         return statusProdutoRepository.findAll();
     }
 
