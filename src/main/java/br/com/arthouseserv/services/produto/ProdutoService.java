@@ -15,16 +15,19 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.plugins.jpeg.JPEGImageWriteParam;
 import javax.imageio.stream.ImageOutputStream;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.*;
 import java.math.BigDecimal;
-import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
 
@@ -65,7 +68,13 @@ public class ProdutoService {
 
         var tipoProduto = tipoProdutoService.getTipoProduto(responseProdutoDTO.tipoProduto());
         var statusProduto = statusProdutoService.getStatusProdutoByNome(responseProdutoDTO.statusProduto());
-        var retornoProdutoSalvo = saveProduto(produtoMapper.produtoDTOToEntity(comprimirImagem(multipartFile.getBytes()), multipartFile.getOriginalFilename(), tipoProduto, statusProduto, responseProdutoDTO.descricao()));
+        var retornoProdutoSalvo = saveProduto(
+                produtoMapper.produtoDTOToEntity(
+                        comprimirImagem(multipartFile.getBytes()),
+                        Objects.requireNonNull(multipartFile.getOriginalFilename()).replaceAll("\\.[^/.]+$", ".webp"),
+                        tipoProduto,
+                        statusProduto,
+                        responseProdutoDTO.descricao()));
 
         responseProdutoDTO.caracteristicasProduto().forEach(x -> {
             var caracteristicasProduto = caracteriticaProdutoService.buscarCaracteristicasProdutoByNome(x);
@@ -105,47 +114,42 @@ public class ProdutoService {
 
     }
 
-    private byte[] comprimirImagem(byte[] imagemOriginal) {
-        try {
 
-            // Converter o array de bytes original em um BufferedImage
-            ByteArrayInputStream bais = new ByteArrayInputStream(imagemOriginal);
+    public byte[] comprimirImagem(byte[] imagemOriginal) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ByteArrayInputStream bais = new ByteArrayInputStream(imagemOriginal)) {
+
             BufferedImage imagem = ImageIO.read(bais);
-
             if (imagem == null) {
-                throw new ProdutosExceptions("A imagem original é inválida.");
+                throw new IOException("A imagem original é inválida.");
             }
+            BufferedImage imagemConvertida = new BufferedImage(imagem.getWidth(), imagem.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = imagemConvertida.createGraphics();
+            g2d.setColor(Color.WHITE); // Define o fundo branco
+            g2d.fillRect(0, 0, imagem.getWidth(), imagem.getHeight()); // Preenche o fundo
+            g2d.drawImage(imagem, 0, 0, null); // Desenha a imagem original
+            g2d.dispose();
 
-            // Criar o output stream para armazenar a imagem comprimida
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-            // Obter um ImageWriter para JPEG
-            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("webp");
             if (!writers.hasNext()) {
-                throw new ProdutosExceptions("Não há ImageWriters disponíveis para JPEG.");
+                throw new IOException("Não há ImageWriters disponíveis para o formato: " + "webp");
             }
             ImageWriter writer = writers.next();
 
-            // Configurar os parâmetros de escrita para compressão
             ImageWriteParam param = writer.getDefaultWriteParam();
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(0.5f); // Ajustar a qualidade entre 0 e 1, onde 1 é a melhor qualidade
 
-            // Criar um ImageOutputStream
             try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {
                 writer.setOutput(ios);
-                writer.write(null, new javax.imageio.IIOImage(imagem, null, null), param);
+                writer.write(null, new IIOImage(imagemConvertida, null, null), param);
             }
 
-            // Obtendo o tamanho da imagem comprimida
-            byte[] imagemComprimida = baos.toByteArray();
-
-            // Retornar a imagem comprimida em base64
-            return imagemComprimida;
-        } catch (Exception e) {
-            throw new ProdutosExceptions("Erro ao comprimir a imagem: " + e.getMessage());
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao comprimir a imagem: " + e.getMessage(), e);
         }
     }
+
 
 
     public OrdenacaoDTO logicaOrdenacao(FiltroProdutoDTO filtroProdutoDTO) {
