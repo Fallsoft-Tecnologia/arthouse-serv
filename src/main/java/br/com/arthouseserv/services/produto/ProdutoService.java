@@ -15,8 +15,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Base64;
+import java.util.Iterator;
 import java.util.List;
 
 @Service
@@ -72,7 +81,8 @@ public class ProdutoService {
 
 
     public byte[] downloadProdutoById(Integer idProduto) {
-        return buscarProduto(idProduto).getContProduto();
+        byte[] produto = buscarProduto(idProduto).getContProduto();
+        return comprimirImagem(produto);
     }
 
 
@@ -90,7 +100,61 @@ public class ProdutoService {
         var cores = filtroProdutoDTO.cores().isEmpty() ? null : filtroProdutoDTO.cores();
         var caracteristicas = filtroProdutoDTO.caracteristicas().isEmpty() ? null : filtroProdutoDTO.caracteristicas();
         var ordenacao = logicaOrdenacao(filtroProdutoDTO);
-        return produtoRepository.getProdutosFiltro(cores, caracteristicas, page, ordenacao.primeiroNumeroOrdenacao(), ordenacao.segundoNumeroOrdenacao());
+
+        // Buscar produtos da base de dados
+        Page<ProdutosDTO> produtos = produtoRepository.getProdutosFiltro(
+                cores, caracteristicas, page, ordenacao.primeiroNumeroOrdenacao(), ordenacao.segundoNumeroOrdenacao());
+
+        // Comprimir as imagens antes de retornar para o front-end
+        produtos.getContent().forEach(produto -> {
+            try {
+                byte[] imagemComprimida = comprimirImagem(produto.getContProduto());
+                produto.setContProduto(imagemComprimida);
+            } catch (ProdutosExceptions e) {
+                throw new ProdutosExceptions("Erro ao comprimir imagem para o produto: " + produto.getNomeProduto() + " - " + e.getMessage());
+            }
+        });
+
+        return produtos;
+    }
+
+    // Método de compressão da imagem
+    private byte[] comprimirImagem(byte[] imagemOriginal) {
+        try {
+            // Converter o array de bytes original em um BufferedImage
+            ByteArrayInputStream bais = new ByteArrayInputStream(imagemOriginal);
+            BufferedImage imagem = ImageIO.read(bais);
+
+            if (imagem == null) {
+                throw new ProdutosExceptions("A imagem original é inválida.");
+            }
+
+            // Criar o output stream para armazenar a imagem comprimida
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            // Obter um ImageWriter para JPEG
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+            if (!writers.hasNext()) {
+                throw new ProdutosExceptions("Não há ImageWriters disponíveis para JPEG.");
+            }
+            ImageWriter writer = writers.next();
+
+            // Configurar os parâmetros de escrita para compressão
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            param.setCompressionQuality(0.5f); // Ajustar a qualidade entre 0 e 1, onde 1 é a melhor qualidade
+
+            // Criar um ImageOutputStream
+            try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {
+                writer.setOutput(ios);
+                writer.write(null, new javax.imageio.IIOImage(imagem, null, null), param);
+            }
+
+            // Retornar a imagem comprimida em base64
+            return Base64.getEncoder().encode(baos.toByteArray());
+        } catch (Exception e) {
+            throw new ProdutosExceptions("Erro ao comprimir a imagem: " + e.getMessage());
+        }
     }
 
     public OrdenacaoDTO logicaOrdenacao(FiltroProdutoDTO filtroProdutoDTO) {
