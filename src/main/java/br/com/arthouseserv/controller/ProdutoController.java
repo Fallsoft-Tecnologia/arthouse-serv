@@ -34,14 +34,26 @@ public class ProdutoController {
 
     }
 
-    @GetMapping(value = "/download", produces = MediaType.IMAGE_JPEG_VALUE)
-    public ResponseEntity<?> downloadProduto(@RequestParam("idProduto") Integer idProduto) {
+    @GetMapping(value = "/download", produces = {"image/webp", "image/jpeg"}) // Adicione JPEG como fallback
+    public ResponseEntity<byte[]> downloadProduto(@RequestParam("idProduto") Integer idProduto) {
         try {
-            return ResponseEntity.status(HttpStatus.OK).body(produtoService.downloadProdutoById(idProduto));
+            // Recuperar a imagem do produto como byte[]
+            byte[] imagemWebP = produtoService.downloadProdutoById(idProduto); // Certifique-se de que este método retorna a imagem em WebP
+
+            if (imagemWebP == null || imagemWebP.length == 0) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+            }
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("image/webp")) // Define o tipo MIME manualmente
+                    .body(imagemWebP);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
+
+
 
     @PostMapping("/filtro")
     public ResponseEntity<?> filtroProdutos(@RequestBody FiltroProdutoDTO filtroProdutoDTO,
